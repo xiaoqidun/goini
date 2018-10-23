@@ -33,6 +33,10 @@ func (ini *GoINI) String() string {
 		}
 		for _, key := range ini.GetNameKeys(name, "") {
 			nameValue := ini.GetString(name, key, "")
+			if ok, _ := regexp.MatchString("^\\s|\\s$", nameValue); ok {
+				iniLines = append(iniLines, key+" = \""+nameValue+"\"")
+				continue
+			}
 			nameValueLen := len(nameValue)
 			if nameValueLen >= 2 &&
 				((nameValue[0] == 34 && nameValue[nameValueLen-1] == 34) ||
