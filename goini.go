@@ -177,10 +177,6 @@ func (ini *GoINI) GetString(name string, key string, value string) string {
 	if 0 == len(name) {
 		name = ini.commonField
 	}
-	if pos := strings.Index(key, "."); pos != -1 {
-		name = key[:pos]
-		key = key[pos+1:]
-	}
 	if v, ok := ini.dataMap[name]; ok {
 		if vv, ok := v[key]; ok {
 			return vv
