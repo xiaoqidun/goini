@@ -56,6 +56,7 @@ func (ini *GoINI) String() string {
 }
 func (ini *GoINI) SetData(fileData []byte) {
 	ini.data = bytes.TrimSpace(fileData)
+	ini.ParseIni()
 }
 func (ini *GoINI) LoadFile(fileName string) error {
 	b, err := ioutil.ReadFile(fileName)
@@ -63,6 +64,7 @@ func (ini *GoINI) LoadFile(fileName string) error {
 		return err
 	}
 	ini.data = bytes.TrimSpace(b)
+	ini.ParseIni()
 	return nil
 }
 func (ini *GoINI) ParseIni() {
