@@ -21,53 +21,7 @@ func NewGoINI() GoINI {
 		commonField: "BuiltCommon",
 	}
 }
-func (ini *GoINI) String() string {
-	var iniLines []string
-	for _, name := range ini.GetNames("") {
-		if name != ini.commonField {
-			if len(iniLines) < 1 {
-				iniLines = append(iniLines, "["+name+"]")
-			} else {
-				iniLines = append(iniLines, "\n["+name+"]")
-			}
-		}
-		for _, key := range ini.GetNameKeys(name, "") {
-			nameValue := ini.GetString(name, key, "")
-			if ok, _ := regexp.MatchString("^\\s|\\s$", nameValue); ok {
-				iniLines = append(iniLines, key+" = \""+nameValue+"\"")
-				continue
-			}
-			nameValueLen := len(nameValue)
-			if nameValueLen >= 2 &&
-				((nameValue[0] == 34 && nameValue[nameValueLen-1] == 34) ||
-					(nameValue[0] == 39 && nameValue[nameValueLen-1] == 39) ||
-					(nameValue[0] == 96 && nameValue[nameValueLen-1] == 96)) {
-				tag := `"`
-				if nameValue[0] == 34 {
-					tag = "`"
-				}
-				iniLines = append(iniLines, key+" = "+tag+nameValue+tag)
-			} else {
-				iniLines = append(iniLines, key+" = "+nameValue)
-			}
-		}
-	}
-	return strings.Join(iniLines, "\n")
-}
-func (ini *GoINI) SetData(fileData []byte) {
-	ini.data = bytes.TrimSpace(fileData)
-	ini.ParseIni()
-}
-func (ini *GoINI) LoadFile(fileName string) error {
-	b, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return err
-	}
-	ini.data = bytes.TrimSpace(b)
-	ini.ParseIni()
-	return nil
-}
-func (ini *GoINI) ParseIni() {
+func (ini *GoINI) parse() {
 	currentName := ini.commonField
 	iniData := make(map[string]map[string]string)
 	iniData[currentName] = make(map[string]string)
@@ -123,6 +77,52 @@ func (ini *GoINI) ParseIni() {
 		iniData[currentName][keyStr] = valueStr
 	}
 	ini.dataMap = iniData
+}
+func (ini *GoINI) String() string {
+	var iniLines []string
+	for _, name := range ini.GetNames("") {
+		if name != ini.commonField {
+			if len(iniLines) < 1 {
+				iniLines = append(iniLines, "["+name+"]")
+			} else {
+				iniLines = append(iniLines, "\n["+name+"]")
+			}
+		}
+		for _, key := range ini.GetNameKeys(name, "") {
+			nameValue := ini.GetString(name, key, "")
+			if ok, _ := regexp.MatchString("^\\s|\\s$", nameValue); ok {
+				iniLines = append(iniLines, key+" = \""+nameValue+"\"")
+				continue
+			}
+			nameValueLen := len(nameValue)
+			if nameValueLen >= 2 &&
+				((nameValue[0] == 34 && nameValue[nameValueLen-1] == 34) ||
+					(nameValue[0] == 39 && nameValue[nameValueLen-1] == 39) ||
+					(nameValue[0] == 96 && nameValue[nameValueLen-1] == 96)) {
+				tag := `"`
+				if nameValue[0] == 34 {
+					tag = "`"
+				}
+				iniLines = append(iniLines, key+" = "+tag+nameValue+tag)
+			} else {
+				iniLines = append(iniLines, key+" = "+nameValue)
+			}
+		}
+	}
+	return strings.Join(iniLines, "\n")
+}
+func (ini *GoINI) SetData(fileData []byte) {
+	ini.data = bytes.TrimSpace(fileData)
+	ini.parse()
+}
+func (ini *GoINI) LoadFile(fileName string) error {
+	b, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+	ini.data = bytes.TrimSpace(b)
+	ini.parse()
+	return nil
 }
 func (ini *GoINI) GetNames(match string) []string {
 	if match == "" {
