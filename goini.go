@@ -16,8 +16,8 @@ type GoINI struct {
 	commonField string
 }
 
-func NewGoINI() GoINI {
-	return GoINI{
+func NewGoINI() *GoINI {
+	return &GoINI{
 		commonField: "BuiltCommon",
 	}
 }
