@@ -2,7 +2,9 @@ package goini
 
 import (
 	"bytes"
+	"errors"
 	"io/ioutil"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -192,4 +194,61 @@ func (ini *GoINI) GetFloat64(name string, key string, value float64) float64 {
 		return f
 	}
 	return value
+}
+func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
+	t := reflect.TypeOf(ptr)
+	v := reflect.ValueOf(ptr)
+	if t.Kind() != reflect.Ptr {
+		err = errors.New("input struct ptr")
+		return
+	} else {
+		t = t.Elem()
+		v = v.Elem()
+	}
+	for i := 0; i < t.NumField(); i++ {
+		if !v.CanInterface() {
+			continue
+		}
+		k := t.Field(i).Tag.Get("goini")
+		if k == "" {
+			k = t.Field(i).Name
+		}
+		switch v.Field(i).Kind() {
+		case reflect.Struct:
+			tt := v.Field(i).Type()
+			vv := v.Field(i)
+			for ii := 0; ii < tt.NumField(); ii++ {
+				if !v.CanInterface() {
+					continue
+				}
+				kk := tt.Field(ii).Tag.Get("goini")
+				if kk == "" {
+					kk = t.Field(ii).Name
+				}
+				switch vv.Field(ii).Kind() {
+				case reflect.Bool:
+					vv.Field(ii).SetBool(ini.GetBool(k, kk, false))
+				case reflect.String:
+					vv.Field(ii).SetString(ini.GetString(k, kk, ""))
+				case reflect.Float32, reflect.Float64:
+					vv.Field(ii).SetFloat(ini.GetFloat64(k, kk, 0))
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					vv.Field(ii).SetInt(ini.GetInt64(k, kk, 0))
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					vv.Field(ii).SetUint(uint64(ini.GetInt64(k, kk, 0)))
+				}
+			}
+		case reflect.Bool:
+			v.Field(i).SetBool(ini.GetBool(ini.commonField, k, false))
+		case reflect.String:
+			v.Field(i).SetString(ini.GetString(ini.commonField, k, ""))
+		case reflect.Float32, reflect.Float64:
+			v.Field(i).SetFloat(ini.GetFloat64(ini.commonField, k, 0))
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			v.Field(i).SetInt(ini.GetInt64(ini.commonField, k, 0))
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			v.Field(i).SetUint(uint64(ini.GetInt64(ini.commonField, k, 0)))
+		}
+	}
+	return
 }
