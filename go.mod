@@ -1,3 +1,3 @@
-module goini
+module github.com/xiaoqidun/goini
 
 go 1.13
