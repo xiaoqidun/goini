@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// GoINI GoINI数据结构
 type GoINI struct {
 	data        []byte
 	dataMap     map[string]map[string]string
@@ -18,11 +19,14 @@ type GoINI struct {
 	commonField string
 }
 
+// NewGoINI 获取GoINI对象
 func NewGoINI() *GoINI {
 	return &GoINI{
 		commonField: "BuiltCommon",
 	}
 }
+
+// parse ini配置文件解析器
 func (ini *GoINI) parse() {
 	currentName := ini.commonField
 	iniData := make(map[string]map[string]string)
@@ -80,6 +84,8 @@ func (ini *GoINI) parse() {
 	}
 	ini.dataMap = iniData
 }
+
+// String 获取GoINI对象字符串形式
 func (ini *GoINI) String() string {
 	var iniLines []string
 	for _, name := range ini.GetNames("") {
@@ -113,10 +119,14 @@ func (ini *GoINI) String() string {
 	}
 	return strings.Join(iniLines, "\n")
 }
+
+// SetData 从代码读取配置并解析
 func (ini *GoINI) SetData(fileData []byte) {
 	ini.data = bytes.TrimSpace(fileData)
 	ini.parse()
 }
+
+// LoadFile 从文件读取配置并解析
 func (ini *GoINI) LoadFile(fileName string) error {
 	b, err := ioutil.ReadFile(fileName)
 	if err != nil {
@@ -126,6 +136,8 @@ func (ini *GoINI) LoadFile(fileName string) error {
 	ini.parse()
 	return nil
 }
+
+// GetNames 获取配置文件分区列表
 func (ini *GoINI) GetNames(match string) []string {
 	if match == "" {
 		return ini.nameList
@@ -138,6 +150,8 @@ func (ini *GoINI) GetNames(match string) []string {
 	}
 	return matchNameList
 }
+
+// GetNameKeys 获取分区下配置项列表
 func (ini *GoINI) GetNameKeys(name string, match string) []string {
 	var keyList []string
 	if name == "" {
@@ -157,6 +171,8 @@ func (ini *GoINI) GetNameKeys(name string, match string) []string {
 	}
 	return keyList
 }
+
+// GetBool 获取单个配置项的布尔值
 func (ini *GoINI) GetBool(name string, key string, value bool) bool {
 	boolStr := ini.GetString(name, key, "")
 	switch strings.ToLower(boolStr) {
@@ -170,6 +186,8 @@ func (ini *GoINI) GetBool(name string, key string, value bool) bool {
 	}
 	return value
 }
+
+// GetInt64 获取单个配置项的数字值
 func (ini *GoINI) GetInt64(name string, key string, value int64) int64 {
 	int64Str := ini.GetString(name, key, "")
 	if i, e := strconv.ParseInt(int64Str, 10, 64); e == nil {
@@ -177,6 +195,8 @@ func (ini *GoINI) GetInt64(name string, key string, value int64) int64 {
 	}
 	return value
 }
+
+// GetString 获取单个配置项的字符值
 func (ini *GoINI) GetString(name string, key string, value string) string {
 	if 0 == len(name) {
 		name = ini.commonField
@@ -188,6 +208,8 @@ func (ini *GoINI) GetString(name string, key string, value string) string {
 	}
 	return value
 }
+
+// GetFloat64 获取单个配置项的小数值
 func (ini *GoINI) GetFloat64(name string, key string, value float64) float64 {
 	float64Str := ini.GetString(name, key, "")
 	if f, e := strconv.ParseFloat(float64Str, 64); e == nil {
@@ -195,6 +217,8 @@ func (ini *GoINI) GetFloat64(name string, key string, value float64) float64 {
 	}
 	return value
 }
+
+// MapToStruct 将配置映射到一个结构体
 func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
 	t := reflect.TypeOf(ptr)
 	v := reflect.ValueOf(ptr)
