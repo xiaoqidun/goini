@@ -1,4 +1,4 @@
-# GoINI
+# GoINI[![PkgGoDev](https://pkg.go.dev/badge/xiaoqidun/goini)](https://pkg.go.dev/xiaoqidun/goini)
 简单易用的Golang INI配置解析库
 # 安装方法
 go get -u github.com/xiaoqidun/goini
