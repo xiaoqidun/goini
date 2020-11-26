@@ -225,10 +225,9 @@ func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
 	if t.Kind() != reflect.Ptr {
 		err = errors.New("input struct ptr")
 		return
-	} else {
-		t = t.Elem()
-		v = v.Elem()
 	}
+	t = t.Elem()
+	v = v.Elem()
 	for i := 0; i < t.NumField(); i++ {
 		if !v.CanInterface() {
 			continue
