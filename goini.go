@@ -12,6 +12,7 @@ import (
 
 // GoINI GoINI数据结构
 type GoINI struct {
+	tag         string
 	data        []byte
 	dataMap     map[string]map[string]string
 	nameList    []string
@@ -22,6 +23,7 @@ type GoINI struct {
 // NewGoINI 获取GoINI对象
 func NewGoINI() *GoINI {
 	return &GoINI{
+		tag:         "goini",
 		commonField: "BuiltCommon",
 	}
 }
@@ -118,6 +120,11 @@ func (ini *GoINI) String() string {
 		}
 	}
 	return strings.Join(iniLines, "\n")
+}
+
+// SetTag 设置结构体的tag键名称
+func (ini *GoINI) SetTag(tag string) {
+	ini.tag = tag
 }
 
 // SetData 从代码读取配置并解析
@@ -232,7 +239,7 @@ func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
 		if !v.CanInterface() {
 			continue
 		}
-		k := t.Field(i).Tag.Get("goini")
+		k := t.Field(i).Tag.Get(ini.tag)
 		if k == "" {
 			k = t.Field(i).Name
 		}
@@ -244,7 +251,7 @@ func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
 				if !v.CanInterface() {
 					continue
 				}
-				kk := tt.Field(ii).Tag.Get("goini")
+				kk := tt.Field(ii).Tag.Get(ini.tag)
 				if kk == "" {
 					kk = t.Field(ii).Name
 				}
