@@ -17,8 +17,8 @@ go get -u github.com/xiaoqidun/goini
 ini := goini.NewGoINI()
 // 从文件获取配置
 if err := ini.LoadFile("./config.ini"); err != nil {
-log.Println(err)
-return
+	log.Println(err)
+	return
 }
 ```
 
