@@ -3,7 +3,7 @@ package goini
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -135,7 +135,7 @@ func (ini *GoINI) SetData(fileData []byte) {
 
 // LoadFile 从文件读取配置并解析
 func (ini *GoINI) LoadFile(fileName string) error {
-	b, err := ioutil.ReadFile(fileName)
+	b, err := os.ReadFile(fileName)
 	if err != nil {
 		return err
 	}
