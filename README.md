@@ -1,6 +1,6 @@
 # GoINI [![PkgGoDev](https://pkg.go.dev/badge/github.com/xiaoqidun/goini)](https://pkg.go.dev/github.com/xiaoqidun/goini)
 
-简单易用的Golang INI配置解析库
+简单易用、零依赖的 Go 语言 INI 配置文件读写库
 
 # 安装方法
 

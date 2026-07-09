@@ -1,185 +1,207 @@
 package goini
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 )
 
-// GoINI GoINI数据结构
+const (
+	defaultTag         = "goini"
+	defaultSeparator   = " = "
+	defaultRootSection = "BuiltCommon"
+)
+
+var (
+	errFilenameRequired      = errors.New("filename required")
+	errStructPointerRequired = errors.New("struct pointer required")
+)
+
+// GoINI 表示INI配置解析器
 type GoINI struct {
-	tag         string
-	data        []byte
-	dataMap     map[string]map[string]string
-	nameList    []string
-	dataKeyList map[string][]string
-	commonField string
+	data                  []byte
+	filename              string
+	fileLines             []iniLine
+	structTag             string
+	rootSection           string
+	sectionKeys           map[string][]string
+	sectionOrder          []string
+	sectionValues         map[string]map[string]string
+	sectionLineIndexes    map[string]int
+	sectionKeyLineIndexes map[string]map[string]int
 }
 
-// NewGoINI 获取GoINI对象
+// NewGoINI 创建GoINI对象
+// 返回: *GoINI GoINI对象
 func NewGoINI() *GoINI {
-	return &GoINI{
-		tag:         "goini",
-		commonField: "BuiltCommon",
-	}
+	return &GoINI{structTag: defaultTag, rootSection: defaultRootSection}
 }
 
-// parse ini配置文件解析器
-func (ini *GoINI) parse() {
-	currentName := ini.commonField
-	iniData := make(map[string]map[string]string)
-	iniData[currentName] = make(map[string]string)
-	ini.nameList = append(ini.nameList, currentName)
-	ini.dataKeyList = make(map[string][]string)
-	for _, v := range bytes.Split(ini.data, []byte("\n")) {
-		line := bytes.TrimSpace(v)
-		lineLen := len(line)
-		if line == nil || lineLen < 3 ||
-			line[0] == 35 || line[0] == 59 {
-			continue
-		}
-		if line[0] == 91 && line[lineLen-1] == 93 {
-			name := bytes.TrimSpace(line[1 : lineLen-1])
-			if name != nil {
-				currentName = string(name)
-				if _, ok := iniData[currentName]; !ok {
-					iniData[currentName] = make(map[string]string)
-					ini.nameList = append(ini.nameList, currentName)
-				}
-			}
-			continue
-		}
-		split := bytes.IndexByte(line, 61)
-		if split == -1 {
-			split = bytes.IndexByte(line, 32)
-			if split == -1 {
-				continue
-			}
-		}
-		key := bytes.TrimSpace(line[0:split])
-		value := bytes.TrimSpace(line[split+1:])
-		valueLen := len(value)
-		keyStr, valueStr := string(key), string(value)
-		if keyStr == "" {
-			continue
-		}
-		if _, ok := iniData[currentName][keyStr]; ok {
-			continue
-		}
-		ini.dataKeyList[currentName] = append(ini.dataKeyList[currentName], keyStr)
-		if value == nil {
-			iniData[currentName][keyStr] = ""
-			continue
-		}
-		if valueLen >= 2 &&
-			((value[0] == 34 && value[valueLen-1] == 34) ||
-				(value[0] == 39 && value[valueLen-1] == 39) ||
-				(value[0] == 96 && value[valueLen-1] == 96)) {
-			iniData[currentName][keyStr] = string(value[1 : valueLen-1])
-			continue
-		}
-		iniData[currentName][keyStr] = valueStr
-	}
-	ini.dataMap = iniData
-}
-
-// String 获取GoINI对象字符串形式
-func (ini *GoINI) String() string {
-	var iniLines []string
-	for _, name := range ini.GetNames("") {
-		if name != ini.commonField {
-			if len(iniLines) < 1 {
-				iniLines = append(iniLines, "["+name+"]")
-			} else {
-				iniLines = append(iniLines, "\n["+name+"]")
-			}
-		}
-		for _, key := range ini.GetNameKeys(name, "") {
-			nameValue := ini.GetString(name, key, "")
-			if ok, _ := regexp.MatchString("^\\s|\\s$", nameValue); ok {
-				iniLines = append(iniLines, key+" = \""+nameValue+"\"")
-				continue
-			}
-			nameValueLen := len(nameValue)
-			if nameValueLen >= 2 &&
-				((nameValue[0] == 34 && nameValue[nameValueLen-1] == 34) ||
-					(nameValue[0] == 39 && nameValue[nameValueLen-1] == 39) ||
-					(nameValue[0] == 96 && nameValue[nameValueLen-1] == 96)) {
-				tag := `"`
-				if nameValue[0] == 34 {
-					tag = "`"
-				}
-				iniLines = append(iniLines, key+" = "+tag+nameValue+tag)
-			} else {
-				iniLines = append(iniLines, key+" = "+nameValue)
-			}
-		}
-	}
-	return strings.Join(iniLines, "\n")
-}
-
-// SetTag 设置结构体的tag键名称
-func (ini *GoINI) SetTag(tag string) {
-	ini.tag = tag
-}
-
-// SetData 从代码读取配置并解析
+// SetData 从字节内容读取配置并解析
+// 入参: fileData 配置文件内容
 func (ini *GoINI) SetData(fileData []byte) {
-	ini.data = bytes.TrimSpace(fileData)
+	ini.filename = ""
+	ini.data = append(ini.data[:0], fileData...)
 	ini.parse()
 }
 
 // LoadFile 从文件读取配置并解析
-func (ini *GoINI) LoadFile(fileName string) error {
-	b, err := os.ReadFile(fileName)
+// 入参: filename 配置文件路径
+// 返回: error 错误信息
+func (ini *GoINI) LoadFile(filename string) error {
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-	ini.data = bytes.TrimSpace(b)
+	ini.filename = filename
+	ini.data = append(ini.data[:0], b...)
 	ini.parse()
 	return nil
 }
 
+// Save 将配置写回LoadFile读取的文件
+// 返回: error 错误信息
+func (ini *GoINI) Save() error {
+	if ini.filename == "" {
+		return errFilenameRequired
+	}
+	return ini.SaveFile(ini.filename)
+}
+
+// SaveFile 将配置写入指定文件
+// 入参: filename 配置文件路径
+// 返回: error 错误信息
+func (ini *GoINI) SaveFile(filename string) error {
+	if filename == "" {
+		return errFilenameRequired
+	}
+	if err := os.WriteFile(filename, []byte(ini.String()), 0o666); err != nil {
+		return err
+	}
+	ini.filename = filename
+	return nil
+}
+
+// String 获取GoINI对象的字符串形式
+// 返回: string 配置文件内容
+func (ini *GoINI) String() string {
+	if len(ini.fileLines) == 0 {
+		return ""
+	}
+	renderedLines := make([]string, len(ini.fileLines))
+	for i, line := range ini.fileLines {
+		renderedLines[i] = renderLine(line)
+	}
+	return strings.Join(renderedLines, "\n")
+}
+
+// SetString 设置单个配置项的字符串值
+// 入参: name 分区名称, key 配置项名称, value 配置项值
+func (ini *GoINI) SetString(name string, key string, value string) {
+	ini.ensureParsed()
+	name = ini.normalizeSection(name)
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return
+	}
+	if index, ok := ini.findSectionKeyLineIndex(name, key); ok {
+		ini.fileLines[index].keyValue = value
+		ini.fileLines[index].modified = true
+		ini.rebuildIndexes()
+		return
+	}
+	ini.ensureSectionLine(name)
+	ini.insertLine(ini.findSectionInsertIndex(name), iniLine{kind: lineKeyValue, sectionName: name, keyName: key, keyValue: value, separator: defaultSeparator, modified: true})
+}
+
+// SetBool 设置单个配置项的布尔值
+// 入参: name 分区名称, key 配置项名称, value 配置项值
+func (ini *GoINI) SetBool(name string, key string, value bool) {
+	ini.SetString(name, key, strconv.FormatBool(value))
+}
+
+// SetInt64 设置单个配置项的整数值
+// 入参: name 分区名称, key 配置项名称, value 配置项值
+func (ini *GoINI) SetInt64(name string, key string, value int64) {
+	ini.SetString(name, key, strconv.FormatInt(value, 10))
+}
+
+// SetFloat64 设置单个配置项的浮点数值
+// 入参: name 分区名称, key 配置项名称, value 配置项值
+func (ini *GoINI) SetFloat64(name string, key string, value float64) {
+	ini.SetString(name, key, strconv.FormatFloat(value, 'f', -1, 64))
+}
+
+// SetComment 设置配置项注释，空注释会删除已有注释
+// 入参: name 分区名称, key 配置项名称, comment 注释内容
+// 返回: bool 是否设置成功
+func (ini *GoINI) SetComment(name string, key string, comment string) bool {
+	if key == "" {
+		return ini.SetSectionComment(name, comment)
+	}
+	ini.ensureParsed()
+	name = ini.normalizeSection(name)
+	key = strings.TrimSpace(key)
+	index, ok := ini.findSectionKeyLineIndex(name, key)
+	if !ok {
+		return false
+	}
+	ini.replaceCommentBefore(index, comment)
+	return true
+}
+
+// SetSectionComment 设置分区注释，空注释会删除已有注释
+// 入参: name 分区名称, comment 注释内容
+// 返回: bool 是否设置成功
+func (ini *GoINI) SetSectionComment(name string, comment string) bool {
+	ini.ensureParsed()
+	name = ini.normalizeSection(name)
+	if name == ini.rootSection {
+		ini.replaceCommentBefore(ini.firstRootLineIndex(), comment)
+		return true
+	}
+	ini.ensureSectionLine(name)
+	index, ok := ini.findSectionLineIndex(name)
+	if !ok {
+		return false
+	}
+	ini.replaceCommentBefore(index, comment)
+	return true
+}
+
 // GetNames 获取配置文件分区列表
+// 入参: match 分区名称正则表达式
+// 返回: []string 分区名称列表
 func (ini *GoINI) GetNames(match string) []string {
-	if match == "" {
-		return ini.nameList
-	}
-	var matchNameList []string
-	for _, name := range ini.nameList {
-		if b, e := regexp.MatchString(match, name); e == nil && b {
-			matchNameList = append(matchNameList, name)
-		}
-	}
-	return matchNameList
+	return matchStrings(ini.sectionOrder, match)
 }
 
 // GetNameKeys 获取分区下配置项列表
+// 入参: name 分区名称, match 配置项名称正则表达式
+// 返回: []string 配置项名称列表
 func (ini *GoINI) GetNameKeys(name string, match string) []string {
-	var keyList []string
-	if name == "" {
-		name = ini.commonField
-	}
-	if keyList, ok := ini.dataKeyList[name]; ok {
-		if match == "" {
-			return keyList
+	name = ini.normalizeSection(name)
+	return matchStrings(ini.sectionKeys[name], match)
+}
+
+// GetString 获取单个配置项的字符串值
+// 入参: name 分区名称, key 配置项名称, value 默认值
+// 返回: string 配置项值
+func (ini *GoINI) GetString(name string, key string, value string) string {
+	name = ini.normalizeSection(name)
+	if v, ok := ini.sectionValues[name]; ok {
+		if vv, ok := v[key]; ok {
+			return vv
 		}
-		var matchKeyList []string
-		for _, key := range keyList {
-			if b, e := regexp.MatchString(match, key); e == nil && b {
-				matchKeyList = append(matchKeyList, key)
-			}
-		}
-		return matchKeyList
 	}
-	return keyList
+	return value
 }
 
 // GetBool 获取单个配置项的布尔值
+// 入参: name 分区名称, key 配置项名称, value 默认值
+// 返回: bool 配置项值
 func (ini *GoINI) GetBool(name string, key string, value bool) bool {
 	boolStr := ini.GetString(name, key, "")
 	switch strings.ToLower(boolStr) {
@@ -194,7 +216,9 @@ func (ini *GoINI) GetBool(name string, key string, value bool) bool {
 	return value
 }
 
-// GetInt64 获取单个配置项的数字值
+// GetInt64 获取单个配置项的整数值
+// 入参: name 分区名称, key 配置项名称, value 默认值
+// 返回: int64 配置项值
 func (ini *GoINI) GetInt64(name string, key string, value int64) int64 {
 	int64Str := ini.GetString(name, key, "")
 	if i, e := strconv.ParseInt(int64Str, 10, 64); e == nil {
@@ -203,20 +227,9 @@ func (ini *GoINI) GetInt64(name string, key string, value int64) int64 {
 	return value
 }
 
-// GetString 获取单个配置项的字符值
-func (ini *GoINI) GetString(name string, key string, value string) string {
-	if 0 == len(name) {
-		name = ini.commonField
-	}
-	if v, ok := ini.dataMap[name]; ok {
-		if vv, ok := v[key]; ok {
-			return vv
-		}
-	}
-	return value
-}
-
-// GetFloat64 获取单个配置项的小数值
+// GetFloat64 获取单个配置项的浮点数值
+// 入参: name 分区名称, key 配置项名称, value 默认值
+// 返回: float64 配置项值
 func (ini *GoINI) GetFloat64(name string, key string, value float64) float64 {
 	float64Str := ini.GetString(name, key, "")
 	if f, e := strconv.ParseFloat(float64Str, 64); e == nil {
@@ -225,60 +238,56 @@ func (ini *GoINI) GetFloat64(name string, key string, value float64) float64 {
 	return value
 }
 
+// GetComment 获取配置项注释
+// 入参: name 分区名称, key 配置项名称
+// 返回: string 注释内容
+func (ini *GoINI) GetComment(name string, key string) string {
+	if key == "" {
+		return ini.GetSectionComment(name)
+	}
+	ini.ensureParsed()
+	name = ini.normalizeSection(name)
+	index, ok := ini.findSectionKeyLineIndex(name, strings.TrimSpace(key))
+	if !ok {
+		return ""
+	}
+	return ini.commentBefore(index)
+}
+
+// GetSectionComment 获取分区注释
+// 入参: name 分区名称
+// 返回: string 注释内容
+func (ini *GoINI) GetSectionComment(name string) string {
+	ini.ensureParsed()
+	name = ini.normalizeSection(name)
+	if name == ini.rootSection {
+		return ini.commentBefore(ini.firstRootLineIndex())
+	}
+	index, ok := ini.findSectionLineIndex(name)
+	if !ok {
+		return ""
+	}
+	return ini.commentBefore(index)
+}
+
+// SetTag 设置结构体的tag键名称
+// 入参: tag tag键名称
+func (ini *GoINI) SetTag(tag string) {
+	ini.structTag = tag
+}
+
 // MapToStruct 将配置映射到一个结构体
-func (ini *GoINI) MapToStruct(ptr interface{}) (err error) {
-	t := reflect.TypeOf(ptr)
+// 入参: ptr 结构体指针
+// 返回: error 错误信息
+func (ini *GoINI) MapToStruct(ptr interface{}) error {
 	v := reflect.ValueOf(ptr)
-	if t.Kind() != reflect.Ptr {
-		err = errors.New("input struct ptr")
-		return
+	if !v.IsValid() || v.Kind() != reflect.Ptr || v.IsNil() {
+		return errStructPointerRequired
 	}
-	t = t.Elem()
 	v = v.Elem()
-	for i := 0; i < t.NumField(); i++ {
-		if !v.CanInterface() {
-			continue
-		}
-		k := t.Field(i).Tag.Get(ini.tag)
-		if k == "" {
-			k = t.Field(i).Name
-		}
-		switch v.Field(i).Kind() {
-		case reflect.Struct:
-			tt := v.Field(i).Type()
-			vv := v.Field(i)
-			for ii := 0; ii < tt.NumField(); ii++ {
-				if !v.CanInterface() {
-					continue
-				}
-				kk := tt.Field(ii).Tag.Get(ini.tag)
-				if kk == "" {
-					kk = t.Field(ii).Name
-				}
-				switch vv.Field(ii).Kind() {
-				case reflect.Bool:
-					vv.Field(ii).SetBool(ini.GetBool(k, kk, false))
-				case reflect.String:
-					vv.Field(ii).SetString(ini.GetString(k, kk, ""))
-				case reflect.Float32, reflect.Float64:
-					vv.Field(ii).SetFloat(ini.GetFloat64(k, kk, 0))
-				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-					vv.Field(ii).SetInt(ini.GetInt64(k, kk, 0))
-				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-					vv.Field(ii).SetUint(uint64(ini.GetInt64(k, kk, 0)))
-				}
-			}
-		case reflect.Bool:
-			v.Field(i).SetBool(ini.GetBool(ini.commonField, k, false))
-		case reflect.String:
-			v.Field(i).SetString(ini.GetString(ini.commonField, k, ""))
-		case reflect.Float32, reflect.Float64:
-			v.Field(i).SetFloat(ini.GetFloat64(ini.commonField, k, 0))
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			v.Field(i).SetInt(ini.GetInt64(ini.commonField, k, 0))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			v.Field(i).SetUint(uint64(ini.GetInt64(ini.commonField, k, 0)))
-		}
+	if v.Kind() != reflect.Struct {
+		return errStructPointerRequired
 	}
-	return
+	ini.mapStruct(v)
+	return nil
 }
