@@ -29,7 +29,7 @@ type iniLine struct {
 	modified    bool
 }
 
-type keyValueParts struct {
+type parsedKeyValue struct {
 	key       string
 	value     string
 	indent    string
@@ -68,12 +68,12 @@ func parseRawLine(rawLine string, sectionName string) (iniLine, string) {
 		line.sectionName = nextSection
 		return line, nextSection
 	}
-	if parts, ok := parseKeyValue(rawLine); ok {
+	if parsed, ok := parseKeyValue(rawLine); ok {
 		line.kind = lineKeyValue
-		line.keyName = parts.key
-		line.keyValue = trimSurroundingQuotes(parts.value)
-		line.indent = parts.indent
-		line.separator = parts.separator
+		line.keyName = parsed.key
+		line.keyValue = trimSurroundingQuotes(parsed.value)
+		line.indent = parsed.indent
+		line.separator = parsed.separator
 		return line, sectionName
 	}
 	return line, sectionName
@@ -91,7 +91,7 @@ func parseSection(line string) (string, bool) {
 	return name, name != ""
 }
 
-func parseKeyValue(line string) (keyValueParts, bool) {
+func parseKeyValue(line string) (parsedKeyValue, bool) {
 	indentLen := leadingSpaceLen(line)
 	indent := line[:indentLen]
 	body := line[indentLen:]
@@ -101,19 +101,19 @@ func parseKeyValue(line string) (keyValueParts, bool) {
 	if split := strings.IndexFunc(body, unicode.IsSpace); split >= 0 {
 		return parseKeyValueParts(body, split, split, indent)
 	}
-	return keyValueParts{}, false
+	return parsedKeyValue{}, false
 }
 
-func parseKeyValueParts(body string, keyEnd int, valueStart int, indent string) (keyValueParts, bool) {
+func parseKeyValueParts(body string, keyEnd int, valueStart int, indent string) (parsedKeyValue, bool) {
 	keyPart := body[:keyEnd]
 	valuePart := body[valueStart:]
 	key := strings.TrimSpace(keyPart)
 	if key == "" {
-		return keyValueParts{}, false
+		return parsedKeyValue{}, false
 	}
 	separatorStart := len(strings.TrimRightFunc(keyPart, unicode.IsSpace))
 	separatorEnd := valueStart + leadingSpaceLen(valuePart)
-	return keyValueParts{
+	return parsedKeyValue{
 		key:       key,
 		value:     strings.TrimSpace(valuePart),
 		indent:    indent,
@@ -222,7 +222,7 @@ func (ini *GoINI) ensureSectionLine(sectionName string) {
 	if len(ini.fileLines) > 0 && renderLine(ini.fileLines[len(ini.fileLines)-1]) != "" {
 		ini.fileLines = append(ini.fileLines, iniLine{kind: lineBlank})
 	}
-	ini.fileLines = append(ini.fileLines, iniLine{kind: lineSection, sectionName: sectionName, text: "[" + sectionName + "]"})
+	ini.fileLines = append(ini.fileLines, iniLine{kind: lineSection, sectionName: sectionName})
 	ini.rebuildIndexes()
 }
 

@@ -87,9 +87,6 @@ func (ini *GoINI) SaveFile(filename string) error {
 // String 获取GoINI对象的字符串形式
 // 返回: string 配置文件内容
 func (ini *GoINI) String() string {
-	if len(ini.fileLines) == 0 {
-		return ""
-	}
 	renderedLines := make([]string, len(ini.fileLines))
 	for i, line := range ini.fileLines {
 		renderedLines[i] = renderLine(line)
@@ -113,7 +110,7 @@ func (ini *GoINI) SetString(name string, key string, value string) {
 		return
 	}
 	ini.ensureSectionLine(name)
-	ini.insertLine(ini.findSectionInsertIndex(name), iniLine{kind: lineKeyValue, sectionName: name, keyName: key, keyValue: value, separator: defaultSeparator, modified: true})
+	ini.insertLine(ini.findSectionInsertIndex(name), iniLine{kind: lineKeyValue, sectionName: name, keyName: key, keyValue: value, separator: defaultSeparator})
 }
 
 // SetBool 设置单个配置项的布尔值
